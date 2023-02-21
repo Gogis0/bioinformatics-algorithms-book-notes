@@ -1,0 +1,391 @@
+\hypertarget{chapter-5-applications-of-esas}{%
+\section{Chapter 5 -- Applications of ESAs}\label{chapter-5-applications-of-esas}}
+
+\begin{itemize}
+\tightlist
+\item[$\square$]
+  finding repeats
+\end{itemize}
+
+\hypertarget{exact-string-matching}{%
+\subsection{Exact String Matching}\label{exact-string-matching}}
+
+This is really easy, similarly to suffix trees, need to find a path from the root that corresponds to the pattern $P$. The leaves in the ST in the subtree rooted after the match are the suffix numbers / occurrences of $P$ in $S$. It's similar with ESAs, we se
+
+\hypertarget{lempel-ziv-factorization}{%
+\subsection{Lempel-Ziv Factorization}\label{lempel-ziv-factorization}}
+
+A Lempel-Ziv (LZ) factorization of a string $S$ is a
+
+\hypertarget{finding-repeats}{%
+\subsection{Finding Repeats}\label{finding-repeats}}
+
+Two (or more) occurrences of a substring $\omega$ in $S$ are called \emph{repeats}.
+We classify reads as:
+\begin{enumerate}
+    \item \textit{Longest} -- repeats of the largest length, i.e. such that no other repeat is longer.
+    \item \textit{Maximal} -- repeats which if we extend to either side the number of occurrences decreases.
+    \item \textit{Supermaximal} -- repeats which if we extend to either side it stops being a repeat (i.e. the number of drops to $0$).
+    Or equivalently, a supermaximal repeat is a repeat that is not a proper substring of another repeat.
+    Each supermaximal repeat is a maximal repeat.
+    \item \textit{Repeated pairs} -- repeats in the form $(p_1, p_2, \ell)$, where $p_1$ and $p_2$ with $p_1 < p_2$ are the starting positions of the occurrences and $\ell$ is the length of the repeat.
+    Repeated pairs are said to be \textit{left maximal} (\textit{right maximal}) if they cannot be extended to the left (right).
+    Repeated pairs are maximal if they are both left and right maximal.
+    \item \textit{Tandem arrays} -- repeats in the form of $\omega = u^k$ for $k \geq 2$, i.e. occurrences of which appear consecutively.
+    Specifically, tandem arrays in the form $uu$ (i.e. $k=2$) are called \textit{tandem repeats}.
+    \item \textit{Periodicities} -- repeats that can be written in the form $w = v^ku$, where $k \geq 2$ and $u$ is a proper prefix of $v$. Naturally we can also define left maximal, right maximal and maximal periodicities.
+\end{enumerate}
+
+\subsubsection{Longest Repeats}
+Very easy, all longest repeats have length $m = \max \{\lcp[i] ~|~ i \in [1..n] \}$.
+A repeat of length $m$ is of course detected by $\lcp[i] = m$.
+To avoid duplicates in the output, we only output the last entries of each 'local maximum' in the $\lcp$.
+We therefore iterate over the $\lcp$ array and output the positions from of the $\sa$ that correspond to the repeats of length $m$.
+
+\begin{minted}{python}
+m = max(LCP)
+longest_reps = []
+for i in range(n+1):
+    # to avoid duplicate outputs
+    if (LCP[i] == m) and (LCP[i+1] < m):
+        longest_reps.append(S[SA[i]:SA[i]+m])
+\end{minted}
+
+However, if we explicitly output the longest repeats as strings, the time complexity of our algorithm grows to $O(n \log n)$, since the total length of all longest repeats can be proportional to $\Theta(n \log n)$ (e.g. the binary de Bruijn string).
+We could avoid this by only outputting the positions of the longest repeats, which would get us the desired $O(n)$ algorithm. 
+
+\subsubsection{Supermaximal Repeats}
+We can detect these by checking the the so called 'local maxima' of the $\lcp$ array for right maximality.
+A local maximum is a an lcp interval $\ell-[i,j]$ in which $\lcp[k] = \ell$ for $i+1 \geq k \geq j$.
+In addition to being a local maximum, an interval $[i,j]$ needs to satisfy that the characters $S[\sa[i] - 1], \ldots, S[\sa[j] - 1]$ are pairwise distinct.
+This check can be accomplished by maintaining a bitvector $B[1..\sigma]$ initialized to all zeros which we will use as an indicator of the preceding characters at positions $[i, j]$ which we have already seen.
+We will also save a \texttt{char\_list} of scanned characters to serve when erasing the written ones into $B$, since scanning the whole $B$  to reinitialize it would add an unnecessary $\sigma$-factor to the time complexity of the checking procedure.
+Clearly, the time complexity of the algorithm is now $O(n)$, which is optimal.
+A pseudocode can be seen in Alg. \ref{alg:supermaximal}.
+
+\begin{figure}[!ht]
+    \centering
+    \begin{minted}{python}
+    char_list = []
+    B = [0]*len(C)
+    supermaximals = []
+    
+    for i in range(1, n+2):
+        rb = i
+        if LCP[i] > LCP[i-1]:
+            lb = i-1
+        if LCP[i] < LCP[i-1]:
+            # check for left-maximality
+            is_ok = True
+            for k in range(lb+1, rb):
+                c = S[ ( SA[k] - 1) % n]
+                if B[c] == 1:
+                    is_ok = False
+                    break
+                B[c] = 1
+                char_list.append(c)
+            # reinitialize B to zeros
+            for x in list:
+                B[x] = 0
+            char_list = []
+            if is_ok:
+                supermaximals.append( (lb, rb-1, LCP[lb+1]) )
+    \end{minted}
+    \caption{An algorithm to find all supermaximal repeats using the ESA.}
+    \label{alg:supermaximal}
+\end{figure}
+
+\subsubsection{Maximal Repeats}
+In maximal repeats, we can adopt a similar approach as in supermaximal repeats (Alg. \ref{alg:supermaximal}) since every local maximum in the $\lcp$ array is a candidate maximal repeat, however, we have to change the left-maximality check.
+In more detail, the condition for the left-maximality in maximal repeats is that the characters preceding the local maximum $\ell-[i, j]$ \textit{must not be all the same}.
+
+This can be accomplished by maintaining a position $\texttt{last\_diff}$ of the last occurrence of different preceding characters $S[\sa[\texttt{last\_diff}-1] - 1 ] \neq S[\sa[\texttt{last\_diff}]-1]$.
+If \texttt{last\_diff} points to the inside of the candidate interval $[i,j]$, i.e. $\texttt{last\_diff} > i$, then we have a maximal repeat, otherwise it is not left-maximal.
+
+Obviously, the Alg. \ref{alg:maximal} also runs in the optimal $O(n)$ time.
+
+\begin{figure}[!ht]
+    \centering
+    \begin{minted}{python}
+    last_diff = 0
+    maximals = []
+    
+    for i in range(1, n+2):
+        rb = i
+        if LCP[i] != LCP[i-1]:
+            last_diff = i
+        if LCP[i] > LCP[i-1]:
+            lb = i-1
+        if LCP[i] < LCP[i-1]:
+           if last_diff > lb:
+                maximals.append( (lb, rb-1, LCP[lb+1]) )
+    \end{minted}
+    \caption{An algorithm to find all maximal repeats using the ESA.}
+    \label{alg:maximal}
+\end{figure}
+
+\subsubsection{Maximal Repeated Pairs}
+Here we have to output all the pairs of repeats that cannot be extended to either side.
+To this end we will utilize the bottom up traversal of the (implicit) LCP interval tree.
+We define $\mathcal{P}_{[i, j]}$ to be the set of all $\sa$ entries in the $[i,j]$ interval. Moreover, for $a \in \Sigma$, let us define $$\mathcal{P}_{[i, j]}(a) = \{ k ~|~ k \in [i, j], S[\sa[k] - 1] = a \},$$
+i.e. the $\mathcal{P}_{[i, j]}(a)$ is the set of all indices in $\mathcal{P}_{[i, j]}$ that are preceded by the character $a$ in $S$.
+
+The computation of all maximal repeated pairs works as follows.
+We will traverse the lcp interval tree in the bottom up fashion and for each lcp interval $\ell - [lb, rb]$ we can assume that its children intervals have already been processed.
+We use the observation that for any $k \in P_{[i,j]}(a), l \in P_{[i',j']}(b)$ for any two different children intervals $[i,j]$ and $[i',j']$ and $a \neq b$ it holds that $(k, l, \ell)$ is a maximal repeated pair.
+This is due to the fact that the left-maximality is guaranteed by $a \neq b$ and right-maximality by $[i,j] \neq [i', j']$.
+
+For every $a \in \Sigma$ we therefore define $P_{[i,j]}^q(a)$ to be the intermediate value of $P_{[i,j]}(a)$ after processing the first $q$ children.
+For the $(q+1)$-th child $[i',j']$ we first output all maximal repeated pairs $(k,l,\ell)$ for $k \in P_{[i,j]}(a), l \in [i', j']$ such that $S[\sa[l] - 1] \neq a$.
+Subsequently we do an update: $$P_{[i,j]}^{q+1}(a) = P_{[i,j]}^{q}(a) \cup \{ k ~|~  k \in [i', j'], S[\sa[k] - 1] = a \}.$$
+
+The total running time of this algorithm is therefore $O(n+z)$, where $z$ is the number of all maximal repeated pairs.
+
+\hypertarget{periodicities}{%
+\subsubsection{Periodicities}\label{periodicities}}
+
+We denote a periodicity by $(b,e,\ell)$, such that $S[b..e] = v^ku$ and $|v| = \ell, |u| < \ell$.
+
+We can find all the periodicities of in a string $S$ of length $n$ in $O(n)$ time.
+The basis of this algorithm is the Lempel-Ziv factorization.
+We divide the set of periodicities into type $2$ -- the periodicities that are completely contained in LZ phrases and type $1$ -- all the other periodicities.
+The high level overview of the algorithm is:
+\begin{enumerate}
+    \item Compute the LZ factorization of $S$.
+    \item Compute the periodicities of type $1$.
+    \item Compute the periodicities of type $2$.
+\end{enumerate}
+
+Before we start explaining the asymptotically optimal algorithm, we first mention some important notions.
+The first one is that the substring $S[b..e]$ is a periodicity of a period $\ell$ if and only if $S[i] = S[i+\ell]$ for $b \leq i \leq e-\ell$.
+The proof of this fact quite simple and the statement is obvious.
+The second thing is that we say that a periodicity $(b,e,\ell)$ has a \textit{period to the left} of position $i$ if it has the $\ell$-length substring ending at the position $i-1$, and \textit{period starting at} position $i$ if it has the $\ell$-length substring starting at $i$.
+
+We will first explain how we can find the type $1$ periodicities.
+Let $s_1, \ldots, s_m$ be the LZ factorization of string $S$ of length $n$.
+The solution is based on the characterization of type $1$ periodicities by dividing them into disjoint groups.
+In particular, a periodicity $(b,e,\ell)$ that ends within a factor $s_j = S[b_j..e_j]$ can either:
+\begin{enumerate}
+    \item Have either a period to the left of $b_j$ or starting at $b_j$ (or both), which we further divide into:
+    \begin{enumerate}
+        \item Those that have a period to the left of $b_j$.
+        \item Those that have a period starting at $b_j$ but have no period to the left of $b_j$. In this case we have $\ell \leq |s_j|$.
+    \end{enumerate}
+    \item Those that start at $b_j \geq b$ and end at $e = e_j$. In this case we have $\ell \leq |s_j|$.
+    \item Those that start at $b_j = b$ and end at $e \leq e_j$. In this case we have $\ell \leq |s_j|$.
+\end{enumerate}
+
+\begin{figure}[!ht]
+    \centering
+    \begin{minted}{python}
+    # functions lcs (lcp) computes the length of the LCS (LCP) in O(1) time
+    B = [0..m-1] # B[i] is the beginning index of the i-th phrase
+    E = [0..m-1] # E[i] is the ending index of the i-th phrase
+    periodicities = [] # this will be the output
+        for i in range(1, m-1):
+            for l in range(1, min(E[i-1], len(S[j-1]) + len(S[j]))):
+                # check for periodicities that have period to the left of i
+                L = lcs(E[i-1], E[i-1]-l)
+                R = lcp(B[i], B[i]-l)
+                if (L+R >= l) and (R > 1 or E[i-1] - l - L > B[i-1]):
+                    periodicities.append(E[i-1] - l - L, E[i-1] + R)
+            for l in range(1, S[i]+1):
+                # check for periodicities that have a period starting at i
+                L = lcs(E[i-1], E[i-1] + l)
+                R = lcp(B[i], B[i] + l)
+                if (L+R >= l) and (L < l) and (B[i] + l + R <= E[i]):
+                    periodicities.append(E[i-1] - L, B[i] + l + R)
+    \end{minted}
+    \caption{Computation of type $1$ periodicities.}
+    \label{falg:type1periods}
+\end{figure}
+
+So we know that periodicities that start and end within $s_j$, or at least have a period starting at $b_j$ but no period to the left of $b_j$, have their periods upper bounded as $\ell \leq |s_j|$.
+Interestingly, it is also possible to find an upper bound of the periodicities that have a period to the left of $b_j$.
+
+It is the consequence of the fact that if $(b,e,\ell)$ has a periodicity to the left of $b_j$, the following holds:
+\begin{enumerate}
+    \item $e \leq e_j$ \label{per:1}
+    \item If $e_{j-1} < e$, then $(b,e,\ell)$ does not have a period to the left of $b_{j-1}$ \label{per:2}
+    \item If $e_{j-1} < e$ then it holds that $|S[b..e]| < 2|s_{j-1}s_{j}|$ (so $\ell < |s_{j-1}s_{j}|$) \label{per:3}
+\end{enumerate}
+
+Let us now sketch the proof of these observations.
+\begin{enumerate}
+    \item 
+    If it was the case that $e_j < e$, then $S[b_j - \ell .. e-\ell]$ is an occurrence of $S[b_j .. e]$ that starts at an earlier position and $|S[b_j .. e]| > |[b_j .. e_j]|$, which is a contradiction with the way the LZ parse is constructed, hence $e \leq e_j$.
+    \item
+    Now if $(b,e,\ell)$ had a period to the left of $b_{j-1}$, then by \ref{per:1} we would get $e \leq e_{j-1}$, which is a contradiction.
+    \item
+    Finally, suppose $|S[b..e]| \geq 2|s_{j-1}s_{j}|$, so by $e \leq e_j$ at least half the characters of $S[b..e]$ appear \textit{strictly before} the position $b_{j-1}$.
+    Since $|S[b..e]| \geq 2\ell$, or in other words $\ell \leq \frac{1}{2} |S[b..e]|$, then that also means there is a period to the left of $b_{j-1}$, which contradicts \ref{per:2}.
+\end{enumerate}
+
+Now that we can bound the period of every periodicity of type $1$ that ends in a particular phrase, we are ready to propose algorithm to compute them in \ref{falg:type1periods}.
+Let us argue that the presented algorithm computes all type $1$ periodicities.
+Let us now prove its correctness.
+We claim that for each phrase $s_j$ for $j \in [2, m]$, the proposed algorithm will \textit{exactly once} output every periodicity $(b,e,\ell)$ such that it:
+\begin{enumerate}
+    \item ends within $s_j$ and crosses the border to the left neighbor. Here we further divide the following cases:
+    \begin{enumerate}
+        \item Those that have a period to the left of $b_j$.
+        \item Those that have a period starting at $b_j$ but have no period to the left of $b_j$.
+    \end{enumerate}
+    \item starts at $b \geq  b_j$ and end at $e = e_j$.
+    \item starts at $b = b_{j-1}$ and end at $e \leq e_{j-1}$.
+\end{enumerate}
+
+The periodicities which have a period to the left of the beginning $b_j$ of the current phrase $s_j$ are being handled in the first for-loop.
+The first condition \texttt{R > 1} in the 'or part' of the if-statement guarantees that only those periodicities ending in $s_j$ will be output (we know that if the periodicity continues to $s_j$, then $e \leq e_j$ in this case), while the second guarantees that only those that begin after $b_{j-1}$ and end at $e_{j-1}$ will be output.
+The second for-loop handles the periodicities that that have periods starting at the particular position $b_j$.
+We must therefore check if there is no period to the left of $b_j$ by \texttt{L < l} and also if the period ends within $s_j$ by \texttt{B[i] + l + R <= E[i]} to avoid duplicate outputs.
+This proves the claim.
+
+Let us now analyze the time complexity of computing type $1$ periodicities.
+Since $lcp$ and $lcs$ can be answered in $O(1)$ time, the question is how many times do we ask these queries.
+That is the number of the for loop iterations over all phrases, which is $$\sum_{j=2}^m |s_{j-1}s_j| - 1 + |s_j| = 2n + n = O(n).$$
+
+Let us now address the problem of computing type $2$ periodicities.
+We do this by using the observation that if a periodicity $(b,e,\ell)$ is properly contained in a phrase $s_j$, i.e. $b_j < b < e < e_j$ (which also implies $|s_j| > 4$), then there is a previous occurrence $S[b - \delta_j .. e - \delta_j]$ of it, where $\delta_j = b_j - t_j$, where $t_j$ is the start of the previous occurrence of $s_j$.
+
+So we are basically looking for re-occurrences of type $1$ periodicities that are completely contained in the phrases.
+Let us have the output of Alg. \ref{falg:type1periods} in the form of $n$ lists in which $L[i]$ is the list containing the periodicities that end at the position $i$.
+We will use counting sort to transform these lists so that $L[i]$ contains all the periodicities \textit{starting} at position $i$ in increasing order of their ending positions.
+This process takes $O(n)$ time, since there are at most $O(n)$ periodicities of type $1$ (which follows from the time complexity of Alg. \ref{falg:type1periods}.).
+The lists $L[i]$ are the processed as in Alg. \ref{alg:type2periodicities}.
+
+Alg. \ref{alg:type2periodicities} maintains the invariant that after finishing the search for the phrase $s_i$, it holds that for $b_j \leq j \leq e_j$ $L[j]$ stores all the periodicities starting at $j$ in the increasing order of their ending positions.
+This is because before adding anything new into $L[j]$ they were already sorted according to their ending positions and each periodicity in $L[j]$ was ending \textit{after} $e_j$.
+We then add new periodicities in such a way that they remain sorted and each of the newly added periodicities ends \textit{before} $e_j$.
+This proves the claim that Alg. \ref{alg:type2periodicities} finds all periodicities of type $2$.
+
+The time complexity of Alg. \ref{alg:type2periodicities} is clearly $O(n+z)$, where $z$ is the number of all maximal periodicities of type $2$ in $S$.
+This follows from the fact that each time the innermost for-loop(s) is executed, we have found a new periodicity.
+
+\begin{figure}[!ht]
+    \centering
+    \begin{minted}{python}
+    prev_occ[0..n-1] # previous occurrence of the i-th phrase (-1 stands for no prev. occ.)
+    B = [0..m-1] # B[i] is the beginning index of the i-th phrase
+    E = [0..m-1] # E[i] is the ending index of the i-th phrase
+    L = [0..n-1] # L[i] is the list of periodicities (b, e, l) starting at position i
+    for i in range(1, n):
+        if prev_occ[i] == -1: continue
+        di = i - prev_occ[i]
+        for j in range(B[i]+1, E[i]):
+            periodicities = []
+            for (b,e,l) in L[j-di]:
+                if j + (b - e + 1) >= E[i]: break # further periodicities are only longer
+                periodicities.append( (b+di, e+di, l) )
+            for p in reversed(periodicities):
+                L[j].prepend(p)
+    \end{minted}
+    \caption{Computation of type $2$ periodicities.}
+    \label{alg:type2periodicities}
+\end{figure}
+
+\subsection{MUMs and MEMs}
+In this section we focus on two definitions of exact matches that are useful in whole genome comparison.
+Let $S_1, S_2$ be strings of lengths $n_1, n_2$.
+Then we define:
+
+\begin{enumerate}
+    \item \textit{Maximal Exact Matches (MEMs)}: An occurrence of a substring $S_1[i \ldots j]$ at position $k$ in $S_2$ is a \text{maximal exact match (MEM)} if and only if the following conditions hold:
+    \begin{enumerate}
+        \item $S_1[i \ldots j] = S_2[k \ldots k + (j-i)]$,
+        \item Either $i = 1$ or $k = 1$ or $S_1[i-1 \ldots j] \neq S_2[k-1 \ldots k + (j-i)]$.
+        \item Either $j = n_1$ or $k+(j-1) = n_2$ or $S_1[i \ldots j+1] \neq S_2[k \ldots k + (j-i)+ 1]$.
+    \end{enumerate}
+    This query returns the set $MEMs := \{(i, j, k) ~|~ S_1[i \ldots j] \text{ is a MEM at position } k \text{ in } S_2 \}$.
+    \item \textit{Maximal Unique Matches (MUMs)}: an occurrence of a substring $S_1[i \ldots j]$ at position $k$ in $S_2$ is a \textit{maximal unique match} if it is a MEM and simultaneously occurs only once in $S_1$ and once in $S_2$. The output of this query is the set $MUMs := \{ (i, j, k) ~|~ S_1[i \ldots j] \text{ is a MUM at position } k \text{ in } S_2 \}$.
+\end{enumerate}
+
+We now address the problem of finding all MUMs and MEMs with the help of the ESAs.
+
+\subsubsection{MEMs}
+MEMs between two strings $S_1, S_2$ are basically just maximal repeated pairs in the form $(k_1, \ell, n_1 + 1 + k_2, \ell)$.
+Therefore it suffices to find all repeated pairs in the GESA of $S_1, S_2$ and output only those whose occurrences are in separate copies -- something which is easy to check in a GESA.
+
+\subsubsection{MUMs}
+In MUMs we need to find MEMs that are also unique.
+Observe that these candidate MEMs are adjacent in the GESA of $S_1, S_2$ and we merely need to check uniqueness and right-maximality.
+This can be easily implemented as a single pass through the LCP array as in \ref{alg:MUMSA}.
+
+\begin{figure}[!ht]
+    \centering
+    \begin{minted}{python}
+    MUMs = []
+    n_1 = len(S1)
+    n_2 = len(S2)
+    for i in range(3, n+1):
+        if D[i - 1] != D[i]:
+            if LCP[i - 1] < LCP[i] and LCP[i+1] < LCP[i]:
+                if S[ (SA[i-1] - 1) % n_1] == S[ (SA[i] - 1) % n_2 ]:
+                    if D[i] == 0:
+                        MUMs.append(SA[i]-1, SA[i-1]-1, LCP[i])
+                    else:
+                        MUMs.append(SA[i-1]-1, SA[i]-1, LCP[i])
+    \end{minted}
+    \caption{Computation of all MUMs of strings $S_1$ and $S_2$ using their GESA.}
+    \label{alg:MUMSA}
+\end{figure}
+
+\subsection{Shortest Unique Substrings}
+\label{sec:SUSSA}
+In this problem we are looking for all shortest substring of $S$ that start at a position $i$, for each position $i$ that is unique in $S$.
+We call these strings the \textit{shortest unique substrings (SUSs)}.
+We can do this by comparing each suffix $S_i$ with $S_{i-1}$ and $S_{i+1}$.
+It may, however, happen that $S_i$ is a prefix of $S_{i+1}$ ($S_{i-1}$ cannot be a prefix of $S_i$ due to how we sort suffixes), so we need an additional check.
+If $|S_i| \geq \ell = \max(\lcp[i], \lcp[i+1]) + 1$, then $S[i..i+\ell - 1]$ is obviously the shortest unique substring starting at $i$.
+
+
+\begin{minted}{python}
+LCP = [1..n+1] # LCP[0] = LCP[n] = -1
+SUS = [-1]*n
+for i in range(1, n):
+    if LCP[i-1] < LCP[i] and LCP[i] > LCP[i+1]:
+        l = max(LCP[i], LCP[i+1]) + 1
+        if (n - SA[i] + 1) >= l:
+            SUS[SA[i]] = l
+\end{minted}
+
+\subsubsection{String-specific SUSs}
+Given a collection of strings $S^1, \ldots, S^m$, a string $s$ is called \textit{string-specific} if it is a substring of exactly one of the strings.
+Moreover, a string $s$ is called \textit{$S^k$-specific} if it is a string-specific string that is a substring of
+$S^k, k \in [1, m]$.
+
+We can find the shortest string-specific substring for every $k \in [1, m]$ by the BFS of the GESA of $S^1, \ldots, S^m$.
+We use an array $minpos$ which will store the position of the $S^k$-specific SUS at $minpos[k]$ and its length in $minlen$ (the $minpos$ is initialized of $-1$, the $minlen$ to $n$).
+
+During the traversal, we maintain the invariant that that each $w$-interval in the queue has $df(w) > 1$ (the document frequency of $w$).
+When we pop the interval $w$-interval $\ell-[i..j]$ from the queue, we inspect all of its child intervals and for each one we distinguish the following cases:
+\begin{enumerate}
+    \item we have a singleton interval $[p, p]$ of the substring $w$.
+    Let us inspect whether the symbol $S_{\sa[p]}^{\#}[\ell+1] = \#_k$, where $j = D[k]$. This is the case iff $\ell = n_k$. We further distinguish:
+    \begin{enumerate}
+        \item If $S_{\sa[p]}^{\#}[\ell+1] = \#_k$ then no prefix $S_{\sa[p]}^{\#}$ ending before $\#_k$ is $S^k$-specific, so there is nothing to do.
+        \item Otherwise $S_{\sa[p]}^{\#}[\ell+1] \neq \#_k$, so the $\ell+1$ prefix of $S_{\sa[p]}^{\#}$ is $S^k$-specific. We therefore update $minlen[k] = \min(minlen[k], \ell+1)$ and $minpos$ accordingly if necessary.
+    \end{enumerate}
+    \item We have a non-singleton lcp interval $\ell-[lb..rb]$, we proceed by checking whether the string $w$ of $[lb..rb]$ is string-specific. We distinguish:
+    \begin{enumerate}
+        \item If $df(w) = 1$, we therefore update $minlen[k] = \min(minlen[k], \ell+1)$ and $minpos$ accordingly if necessary.
+        In this case is not necessary to inspect the child intervals of $[lb..rb]$ since it is obvious that they cannot change the current result for $S^k$.
+        \item if $df(w) > 1$ we generate the children intervals of $[lb..rb]$ and add them to the queue.
+    \end{enumerate}
+\end{enumerate}
+
+The running time of the listed algorithm is proportional to the number of visited intervals, which is $O(n)$.
+
+\hypertarget{traversals-through-suffix-links}{%
+\subsection{Traversals Through Suffix Links}\label{traversals-through-suffix-links}}
+
+Suffix links (SLs) are a concept similar to failure links in tries.
+We call a triple $(\psi, \phi, c)$ a \textit{suffix link} if $\overline{\psi} = cu$, where $c \in \Sigma$, $u \in \Sigma^*$ and $\overline{\phi} = u$.
+Whenever we are matching a string against the ST/ESA and encounter a mismatch at a vertex $v$, we can follow its suffix link $\phi(v)$ to effectively continue the matching. The suffix links can be computed.
+
+\subsubsection{Computation}
+SLs can be computed in a /similar fashion as the failure links in the suffix array. However, it is not so straightforward to show that the computation can be done in $O(n)$ time, since our tree is compacted.
+
+\subsubsection{Matching Statistics}
+We can utilize the suffix links to effectively compute the matching statistics of a pattern $P$ against a string $S$.
+The matching statistics is the set $$\text{MS} = \{(i, p,\ell) ~|~ S[p..p+\ell] \text{ is the longest occurrence of } P_i \text{ in } S \}.$$

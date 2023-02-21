@@ -1,0 +1,41 @@
+\hypertarget{chapter-8---alignment}{%
+\section{Chapter 8 - Alignment}\label{chapter-8---alignment}}
+
+\hypertarget{pairwise-alignment}{%
+\subsection{Pairwise Alignment}\label{pairwise-alignment}}
+
+For two sequences $S_1, S_2$ of lengths $n_1, n_2$ over an alphabet $\Sigma$, we define the \textit{global alignment} of $S_1$ and $S_2$ a matrix $A_{2 \times m} = (a_{i,j})$ of symbols over $\Sigma \cup \{-\}$, where the '$-$' symbol is called the \textit{gap}, in which:
+\begin{enumerate}
+    \item For each $1 \leq i \leq 2, 1 \leq j, \leq m$ it holds that $a_{i,j} \in \Sigma \cup \{-\}$.
+    \item After deleting the $-$ symbols from $a_{i,1}, \ldots, a_{i, m}$, we get $S_i$ for $i = 1,2$.
+    \item No column in $A$ consists of two $-$ symbols.
+\end{enumerate}
+
+For a distance function $\delta: $
+
+\begin{equation}
+\textbf{NW}[i, j] = \max
+\begin{cases} 
+    \textbf{NW}[i - 1, j - 1] + s(x_i, y_j), & \text{if } x_i \text{ is aligned to } y_j\\
+    \textbf{NW}[i, j - 1] - 1, & \text{if } x_i \text{ is aligned to a gap}\\
+    \textbf{NW}[i - 1, j] - 1, & \text{if } y_j \text{ is aligned to a gap}.
+\end{cases}
+\end{equation}
+
+\hypertarget{hirschberg-method}{%
+\subsubsection{Hirschberg Method}\label{hirschberg-method}}
+
+\subsubsection{Affine Gaps}
+
+
+\hypertarget{multiple-sequence-alignment-msa}{%
+\subsection{Multiple Sequence Alignment (MSA)}\label{multiple-sequence-alignment-msa}}
+
+\hypertarget{pruning-the-search-space}{%
+\subsubsection{Pruning the Search Space}\label{pruning-the-search-space}}
+
+\hypertarget{apx-method}{%
+\subsubsection{2-APX Method}\label{apx-method}}
+
+\hypertarget{heuristical-methods}{%
+\subsubsection{Heuristical Methods}\label{heuristical-methods}}

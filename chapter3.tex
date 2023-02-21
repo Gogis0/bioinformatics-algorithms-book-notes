@@ -1,0 +1,125 @@
+\hypertarget{chapter-3---range-minimum-queries-rmqs}{%
+\section{Chapter 3 - Range Minimum Queries (RMQs)}\label{chapter-3---range-minimum-queries-rmqs}}
+
+Given an array \(A$ of \(n$ elements from a totally ordered set, we would like to be able to efficiently support the \textbf{r}ange \textbf{m}inimum \textbf{q}ueries $\text{RMQ}(i, j) = k$, such that $A[k] = \min \{A[o] ~|~ i \leq o \leq j\}$. Moreover, consider a tree $T$ of $n$ vertices, in which we would like to support the \textbf{l}owest \textbf{c}ommon \textbf{a}ncestor queries \(\text{LCA}(u, v)$, which gives us the lowest common ancestor \(w$ of vertices \(u, v$. We can, of course, solve both problems without any sorts of preprocessing, which results in a \(O(n)$ time complexity per query and \(O(1)$ of required memory.
+
+This is, however, far from satisfactory as we can most of the times afford to spend some time on preprocessing. It is also possible to simply precompute everything, i.e.~spending \(O(n^2)$ time to store all of the queries into \(O(n^2)$ words of memory, which can later be accessed in \(O(1)$ per query. This stops being feasible rather quickly as \(n$ rises. Surprisingly though, we will show that we can, in fact, achieve \(O(1)$ time per query with only \(O(n)$ preprocessing for each of the problems! Moreover, we will show that the RMQ problem is equivalent to the LCA problem in the sense that one can be effectively solved provided an effective algorithm for the other.
+
+\subsection{RMQ vs. LCA}
+Here we show the equivalence of the RMQ and the LCA problems. In each of the implications we assume that there is a $O(n)$-preprocessing/$O(1)$-query time algorithm for one problem and we have the task to devise asymptotically the same method for the other.
+
+\paragraph{RMQ $\implies$ LCA.}
+We do the Euler tour resp. preorder traversal of $T$:
+\begin{enumerate}
+    \item Visit the root
+    \item Traverse the left subtree
+    \item Traverse the right subtree
+\end{enumerate}
+
+During the traversal we store each vertex identifier into the array $E[1..2n-1]$, and its depth into $D[1..2n-1]$. Afterwards we compute the array $R[1..n]$ which stores the first index of a vertex in $E$. It is not hard to see that $\text{LCA}(u, v) = E[\text{RMQ}_D(R[u], R[v])]$.
+
+\paragraph{LCA $\implies$ RMQ.}
+We first introduce some notation. The \textit{Cartesian tree} of an array $A[l..r]$ is a tree of which root corresponds to the index $l \leq m \leq r$ such that $A[m]$ is the minimum in $A[l..r]$, its left child is $A[l..m-1]$ if $l < m-1 $, otherwise there is no child and similarly $A[m+1..r]$ is the right child if $m+1 < r$.
+The Cartesian tree of an array $A$ is denoted as $\mathcal{C}(A)$.
+
+Its not hard to notice that a Cartesian tree is not unique (which minimum we take as the root if there is more than one?).
+To fix this issue we introduce the so called \textit{canonical} Cartesian trees, in which always the leftmost minimum is picked as the root.
+A canonical Cartesian tree is denoted as $\ccan{A}$ and can be constructed in $O(n)$ time.
+Before we dig into showing how, we introduce one more notion -- the \textit{rightmost path} of the canonical Cartesian tree is the sequence of vertices $\text{root} = v_1, \ldots, v_k$ obtained by starting in the root node and following the edges to the right children while there is a right child.
+We show how $\ccan{A}$ can be constructed for all the blocks in $O(n)$ time.
+We can construct a $\ccan{A}$ for an array $A[1..n]$ in $O(n)$ time by the following iterative algorithm:
+\begin{enumerate}
+    \item For $i = 1$, the $\ccan{A[1]}$ consists just of a root node.
+    \item For $i > 1$, the $\ccan{A[1..i+1]}$ can be constructed from the $\ccan{A[1..i]}$ using by means of the following observations. We know that the node representing $i+1$ has to be on the end of the rightmost path in the tree. We therefore start jumping from the last added vertex $i$ upwards until we find a suitable position for the insertion of $i+1$. This is one of the following cases:
+    \begin{enumerate}
+        \item $i+1$ is the right child of $i$
+        \item $i+1$ is the new root
+        \item $i+1$ is inserted 'somewhere in the middle of the rightmost path' 
+    \end{enumerate}
+\end{enumerate}
+
+The algorithm can then be summarized as:
+\begin{enumerate}
+    \item Build $\ccan{A[1..n]}$ in $O(n)$ time.
+    \item Prepare $\ccan{A[1..n]}$ for constant time $LCA$ queries, which takes $O(n)$ time.
+    \item Each $\rmq{i}{j}$ can be answered as $\lca{i}{j}$.
+\end{enumerate}
+
+
+\hypertarget{rmq---overlapping-intervals}{%
+\subsection{RMQ - The Sparse Table Algorithm}\label{rmq---overlapping-intervals}}
+
+We can achieve a better trade off in preprocessing vs.~query time if we do the following.
+We precompute the RMQ values for all intervals of sizes that are powers of $2$.
+This can be done in $O(n \log n)$ time in using simple dynamic programming, storing the results in a table of $O(n \log n)$ entries.
+Then every query $\text{RMQ}(i, j)$, where $m = i-j+1$ can be answered by combining two intervals of size $2^k$, where $k = \max \{i ~|~ = 2^i \leq m\}$.
+
+\subsection{RMQ - The Optimal Algorithm}
+\begin{enumerate}
+    \item Divide the input array $A[1..n]$ into block of size $s = \frac{\log n}{4}$.
+    \item Create arrays $A'$ and $B'$, both of size $\frac{n}{s}$, where $A'[i]$ stores the the minimum of the $i$-th block and $B'[i]$ is the position of that minimum in the block. 
+    \item Preprocess $A'$ and $B'$ as in the sparse $M'$ table algorithm. \label{rmq:step3}
+    \item For each block, precompute the RMQs for all intervals completely contained inside the block.
+\end{enumerate}
+
+We can now answer the $\text{RMQ}(i, j)$ queries as follows:
+\begin{enumerate}
+    \item If $i-j+1 > s$, then the interval $[i,j]$ spans more then one block. We therefore divide the query into three queries $a  = \text{RMQ}(i, k_1), b = \text{RMQ}(k_1, k_2), c = \text{RMQ}(k_2, j)$, where $k_1$ is the nearest block boundary following $i$ and $k_2$ is the nearest block boundary preceding $j$. The values $a, c$ can be obtained from the precomputed values, the value $b$ from the sparse table $M'$ of the block minimums in $A'$. Of course, we need to remap the index of $b$, but that is easy. The result of the query is the $\min \{a,b,c\}$.
+    \item If $i-j+1 \leq s$, then the interval $[i,j]$ is completely contained within a block, so we just output the minimum according to the precomputed table.
+\end{enumerate}
+
+Step \ref{rmq:step3} requires $O(\frac{n}{s} \log \frac{n}{s}) = O(\frac{4n}{\log n} \log \frac{4n}{\log n}) = O(n)$ time and memory.
+To estimate the size of the table of all in-block queries, we use the observation that for blocks $A,B$, it holds that $\text{RMQ}_A(i, j)$ = $\text{RMQ}_B(i, j)$ for all $1 \leq i \leq j \leq s$ if and only if $\mathcal{C}^{\text{can}(A)} = \mathcal{C}^{\text{can}(B)}$.
+There is $C_n = \frac{1}{n+1} \binom{2n}{n}$ different Cartesian trees\footnote{$C_n$ is known as the \textit{Catalan} number}, which can be bounded by the Stirling's formula as $C_n = O\Big( \frac{4^n}{n^{\frac{3}{2}}} \Big)$.
+The table that stores the precomputed queries for all blocks then takes $$O(C_s \cdot s \cdot s) = O(\frac{4^s s^2}{s^{\frac{3}{2}}}) = O(4^s \sqrt{s}) = O(n)$$ of space.
+
+The last question we need to answer is how to effectively find the type of each block.
+
+
+We associate the sequence of integers $l_1, \ldots, l_n$ with the aforementioned construction in the following way -- $l_i$ is the number of vertices that is on the rightmost path in $\ccan{A[1..i]}$ but not on the rightmost path in $\ccan{A[1..i+1]}$.
+It can be shown that this sequence uniquely characterizes $\ccan{A[i..n]}$.
+We stress that it is possible to compute the sequence $l_1, \ldots, l_n$ even without explicitly computing the $\ccan{A}$ (an exercise for the attentive reader :D).
+
+\hypertarget{rank-and-select-in-o1-time-for-bitvectors-not-in-the-book}{%
+\subsection{\texorpdfstring{Rank and Select in $O(1)$ time for bitvectors (not in the book)}{Rank and Select in O(1) time for bitvectors (not in the book)}}\label{rank-and-select-in-o1-time-for-bitvectors-not-in-the-book}}
+
+\hypertarget{rank}{ \subsubsection{Rank}\label{rank}}
+
+First we divide the bitvector \(B$ of size \(|B| = n$ into \emph{superblocks} of size \(\log^2 n$ and for each ending position in a superblock we calculate the rank. Since we have \(\frac{n}{\log^2 n}$ superblocks, this is takes \(O(\frac{n}{\log n}) = o(n)$ bits in total.
+
+Now, each superblocks is further divided into \emph{blocks} of size \(\frac{1}{2} \log n$. For each block, the rank \emph{in terms of its parent superblock} is calculated. We have \(O(\frac{n}{\log n})$ blocks and each such rank takes \(\log \log^2 n = 2\log \log n$ bits, so in total this takes \(O(\frac{n \log \log n}{\log n}) = o(n)$ bits.
+
+The last thing we need is to precompute the rank for each bitvector of length \(\frac{1}{2} \log n$. There is \(2^{\frac{1}{2} \log n} = \sqrt{n}$ such bitvectors, so storing the results in a table takes \(\sqrt{n} \log n \log \log n = o(n)$.
+
+Now we have all the ingredients. To get \(\text{rank}_1 (B, k)$, we first get the rank up to the nearest superblock, then up to the nearest block and finally we look into the table and add what is left to calculate. Obviosuly we only use \(o(n)$ bits in addition to the \(n$ bits of \(B$.
+
+However, it's not the fastest solution in practice, since we have \(3$ cache misses in the worst case. To alleviate this at lieast a bit we can use the \emph{popcnt} instruction to compute the rank inside of a block.
+
+\hypertarget{select}{%
+\subsubsection{Select}\label{select}}
+
+First we calculate \(\text{select}_b (B, k)$ for each multiple \(t_1 = \log n \log \log n$. This divides \(B$ into \emph{superblocks} or different sizes. We can then classify the superblocks into two categories:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Large and sparse superblocks of which size is \(\geq t_1^2$. For these we can afford to directly precompute and store all the selects. Together it takes \(O(\frac{n}{t_1^2} t_1 \log n) = o(n)$ bits.
+\item
+  Smaller and dense superblocks of size \(< t_1^2$. For these we use the same approach for \(t_2 = (\log \log n)^2$. For the multiples of \(t_2$ we precompute and store the selects, which takes \(O(\frac{n}{t_1^2} \log \log n) = o(n)$ bits total, since the select for one position inside of a superblock takes \(\log \big( (\log n \log \log n)^2 \big) = O(\log \log n)$ bits.
+
+  \begin{enumerate}
+  \def\labelenumii{\arabic{enumii}.}
+  \tightlist
+  \item
+    For the small (size \(\geq t_2^2$) superblocks we directly write the positions of ones (inside of outer). Each such position takes \(\log t_1 = O(\log \log n)$ bits, so in total this takes \(O(\frac{n}{t_w^2} t_1 \log \log n) = O(\frac{n}{(\log \log n)^4} (\log \log n)^2 \log \log n) = O(\frac{n}{\log \log n}) = o(n)$ bits.
+  \item
+    There is only a small number of small superblocks (size \(\leq t_2^2$), so we can precompute and store them into a table of size \(\frac{n}{t_2^2} 2^{(\log \log n)^4} = o(n)$.
+  \end{enumerate}
+\end{enumerate}
+
+AD1: No known relation between \(\text{select}_0 (B, k)$ and \(\text{select}_1 (B, k)$.
+
+AD2: In practice, binary search using rank may suffice.
+
+souce: {[}Kuko's notes{]} (https://people.ksp.sk/\textasciitilde kuko//ds/mat/succinct.pdf)

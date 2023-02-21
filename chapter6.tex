@@ -1,0 +1,111 @@
+\hypertarget{chapter-6---making-esa-components-smaller}{%
+\section{Chapter 6 - Making ESA Components Smaller}\label{chapter-6---making-esa-components-smaller}}
+
+\subsection{Suffix Array}
+The $\phi: [1..n] \to [1..n]$ function, defined as $\phi(i) = \isa[\sa[i]+1]$, is increasing on each interval $[C[c]+1, C[c+1]]$ for $c \in \Sigma$.
+We can use some differential encoding for this, i.e. effectively encode the increasing the intervals by storing $\phi(i+1) - \phi(i)$.
+There is literature on how to do this effectively, while still supporting $O(1)$ random access to $\phi$.\
+
+When we have $\phi$ in the compressed form with fast random access, we can support pattern matching in $O(m \log n)$ time by binary searching the pattern and at each position extracting the length $m$ prefix of S -- $S[\sa[i] .. \sa[i] + m -1]$.
+
+\subsubsection{Sampled Suffix Array}
+The compressed $\phi$ function serves well to answer existence resp. count queries, but not the locate queries.
+To find those we need to access the SA in the interval found using the binary search on $\phi$.
+However, storing the whole SA takes a lot of space.
+It is possible to shrink it down by storing only the $SA$ entries at each $k$-th position in text.
+We will also store a bitvector $B[1..n]$ in which $B[i] = 1$ iff $SA[i]$ was sampled (or $i \equiv 0 (\text{mod } k)$).
+This data structure is called a sampled suffix array (SSA).
+
+We can utilize it to find the occurrence(s) of a substring in an interval $[i..j]$ by accessing $\sa[o]$ for $o \in [i..j]$ by $\sa[\phi^d[o]] - d$, where $o \leq k$ is the 'distance' of $SA[i]$ from the nearest sampled SA entry (a special case is $\sa[\phi^d[o]] - d] < 0$).
+The running time of accessing $\sa[i]$ is therefore $O(k)$ for a sampling rate $k$.
+
+\subsection{Compressed PLCP Array}
+Since $\plcp[i] \geq \plcp[i-1]-1$, if we add $i$ to both sides. Then the difference of the two subsequent PLCP values is:
+$$\delta(i) = (\plcp[i] + i) - (\plcp[i-1] + i - 1) = \plcp[i] - \plcp[i-1] + 1 \geq 0,$$
+
+which we can encode by $B=  0^{\delta(1)}1 \ldots 0^{\delta(n)}1$. This representation has $n$ ones and at most $n-1$ zeroes, since $\plcp[i] \leq n-1$. In total, there is at most $2n-1$ bits.
+If we preprocess the bitvector $B$ for efficient rank/select queries, we can easily compute $\plcp[i]$ as $\plcp[i] = \select(i) - 2i$, because $$\sum_{j=1}^i \plcp[j] - \plcp[j-1] + 1 =  \plcp[i] + i = \select(i) - i$$ as the number of ones leading up to the position of $i$-th one is $i$.
+
+
+We can therefore support random access to $\plcp[i]$ using only $2n-1 + o(n)$ bits. However, what we need in many application is not access to the $\lcp$ in text order, but in the suffix array order. In that case what we would need to do for such $i$ is find a $j = SA[i]$ and return $\plcp[j]$.
+This takes $O(s)$ time when we have a SSA with the sample rate of $s$, but as we can see in the following, there is a representation that allows $O(1)$ access to $\lcp[i]$.
+
+\subsection{BPS Construction for LCP}
+We will first define some cool things. A \textit{balanced parenthesis sequence (BPS)} can be formally defined as a grammar:
+
+\begin{enumerate}
+    \item The empty string $\varepsilon$ is a BPS.
+    \item If $e$ is a BPS, then $(e)$ is a BPS.
+    \item If $a$ and $b$ are BPSs, then $ab$ is a BPS.
+\end{enumerate}
+
+So BPSs are strings of parenthesis that correspond to valid arithmetic terms, given that some operations and variables are inserted. For example $(())()$ is a valid BPS while $(()($ is not.
+
+The second concept is a \textit{super-cartesian tree (SCT)}, which is a cartesian tree that is allowed to have right siblings, i.e. vertices that specifically represent the same value.
+More formally, a SCT of an array $A[l..r]$ is constructed by:
+\begin{enumerate}
+    \item Let $k = \rmq{l}{r}$ be the root of the current subtree $T$.
+    \item Let SCT($A[l..r]$) be the left child of $T$ if $l < r$ (otherwise there is no left child).
+    \item If there is $m > k$ such that $A[k] = A[m]$, then SCT($A[k+1, r]$) is the right \textit{sibling} of $T$. Otherwise SCT($A[k+1, r]$) is the right \textit{child} of $T$ (except the case when $r \leq k+1$, in which there is neither right child nor sibling).
+\end{enumerate}
+
+The algorithm we just described can be obviously implemented so that it runs in $O(n)$ time, where $n$ is the length of the array.
+If we have a SCT of an array $A$, we are now ready to construct its BPS.
+Apart from the parenthesis sequence we will use a bitvector $B$ which contains an element for each closing parenthesis and tells us that if it corresponds to a right sibling or a right child.
+The BPS from a SCT can be constructed as follows:
+\begin{enumerate}
+    \item Write a left parenthesis.
+    \item Write the BPS of the left child.
+    \item Write the right parenthesis.
+    \item Write the BPS of the right child/sibling. If it is the case of a sibling, write $0$ to $B$, otherwise write $1$ to $B$.
+\end{enumerate}
+
+There is $C_n = \frac{1}{n+1} \binom{2n}{n}$ binary trees of $n$ vertices, which can be approximated by the Stirling's formula to $C_n \approx \frac{4^n}{n^{\frac{3}{2}} \sqrt{\pi}} \approx 2^{2^n}$, so $\log C_n \approx 2n$.
+BPS of a tree is useful since it requires only $2n$ bits, which as we see is close to the information theoretic minimum and with additional $o(n)$ we can allow traversing the tree in the BPS representation.
+For the traversals, we require the following operations which are too complicated to describe here\footnote{not in the book}, but we will use them.
+In the following, we denote $(_i$ to be the position of the opening parenthesis corresponding to the value $\lcp[i]$.
+These operations are:
+\begin{enumerate}
+    \item $\text{rank}_((i)$ -- a simple rank, for which we get $\text{rank}_(( (_i ) = i$, similarly for $\text{rank}_)(i)$.
+    \item $\text{select}_((i)$ -- a simple select for which $\text{select}_((i) = (_i$, similarly for $\text{rank}_((i)$.
+    \item $\text{findclose}(i)$ -- find the closing parenthesis corresponding to $(_i$.
+    \item $\text{findopen}(i)$ -- find the opening parenthesis corresponding to $(_i$.
+    \item $\text{enclose}(i)$ -- find the parenthesis pair $(_j )_j$ that most tightly encloses $(_i )_i$, i.e. the largest $j$ such that $\text{findclose}(i) < \text{findclose}(j)$.
+    \item $\text{rr\_enclose}(i, j)$ -- range restricted enclose, i.e. the parentheses $(_k )_k$ that most tightly enclose the $(_j )_j$ and simultaneously $\text{findclose}(i) < (_k$. If there is no such pair of parenthesis, then the result is $\perp$. 
+\end{enumerate}
+
+However, we do not explicitly construct a SCT, but we directly construct the BPS of the SCT of $A$ using the following algorithm:
+\begin{minted}{python}
+LCP = [0..n] # LCP[0] = LCP[n] = -1
+BPS = ['('], B = [1] # B[0] is a sentinel
+s = stack([0])
+for i in range(n+1):
+    while LCP[i] <= LCP[s.top()]:
+        s.pop()
+        BPS.append(')')
+        if LCP[i] == LCP[s.top()]:
+            B.append(0)
+        else: # LCP[i] < LCP[s.top()]
+            B.append(1)
+    BPS.append('(')
+    s.push(i)
+BPS.append('))')
+B.append(01) # for LCP[0] = LCP[n] = -1
+\end{minted}
+
+We can support the following operations on the BPS.
+We write $)_i^0$ resp. $)_i^1$ if the corresponding entry in the bitvector $B$ is $0$ resp. $1$.
+
+\paragraph{getParent($i, j$).}
+Given $(_i$, representing a lcp interval by the pair $(_i, )_i$, we need to find the pair of parentheses $(_j )_j$ corresponding to its parent interval.
+As described before, we can obtain the parent interval of
+
+$$\text{NSV}(i) = $$
+
+\paragraph{getKthChild($i,j$).}
+We have a lcp interval $\ell-[i..j]$ and want to return its $k$-th child.
+We know from before that we only need to find the $\ell$-indices, from which we can easily generate the children intervals.
+
+To do that, we start with computing $ipos = \text{select}_( (i)$ and $cipos = \text{findclose}(ipos)$.
+Now let us look at what happens when on the stack when we write the $(_{j+1}$. Let $i_1 \leq \ldots \leq i_m$ be the $\ell$-indices of the interval $[i..j]$.
+The stack contains $)_{i_m} \ldots )_{i_1} (_{j+1}$.

@@ -1,0 +1,94 @@
+\hypertarget{chapter-2---exact-string-matching}{%
+\section{Chapter 2 - Exact String Matching}\label{chapter-2---exact-string-matching}}
+
+The problem is defined as follows: we have a string \(S$ of length \(n$ and a string \(P$ of length \(m$ (called a \emph{pattern}), and we need to find all the occurrences of \(P$ in \(S$. Formally, this is the set \(\text{Occ} = \{i ~|~ S[i + m-1] = P\}$. Ofc. brute-force gives us a \(O(nm)$ algorithm, but as we can see later, we can do better.
+
+\hypertarget{boyer-moore-horspool}{%
+\subsection{Boyer-Moore-Horspool}\label{boyer-moore-horspool}}
+
+The Boyer-Moore-Horspool (BMH) algorithm is based on the two heuristics called \emph{good suffix} and \emph{bad character}. The bad character heuristic causes the algorithm to shift the comparison at least one position for each mismatch. While the BMH still attains the \(O(nm)$ worst case running time, it is sublinear in expectation. There is also an extension of the BMH that runs in \(O(n+m)$ time (not explained in the book).
+
+The BMH algorithm compares the pattern to each position in \(S$ from right to left. The idea behind the bad char. heuristic is that when a mismach happens on the position \(T[k] = P[j]$, then we can shift \(P$ so that the character \(T[k]$ is aligned to the highest index \(l \in \{1, \ldots, j-1\}$ such that \(P[l] = T[k]$. We can easily see that this shift is \emph{safe}, meaning that we do not skip occurrences of \(P$. As shift \(P$ by at least one positoin, oftentimes even by more than one, we save a certain number of comparisons. This number is reasonably large in practice.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{i }\OperatorTok{=} \DecValTok{0}
+\ControlFlowTok{while}\NormalTok{ i }\OperatorTok{\textless{}} \BuiltInTok{len}\NormalTok{(S):}
+    \ControlFlowTok{for}\NormalTok{ j }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(}\BuiltInTok{len}\NormalTok{(P)}\OperatorTok{{-}}\DecValTok{1}\NormalTok{, }\DecValTok{0}\NormalTok{, }\OperatorTok{{-}}\DecValTok{1}\NormalTok{):}
+        \ControlFlowTok{if}\NormalTok{ P[i] }\OperatorTok{!=}\NormalTok{ S[i]:}
+\NormalTok{            i }\OperatorTok{+=}\NormalTok{ bad\_char(j)}
+            \ControlFlowTok{break}
+\NormalTok{    output(i)}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{knuth-morris-pratt-kmp}{%
+\subsection{Knuth-Morris-Pratt (KMP)}\label{knuth-morris-pratt-kmp}}
+
+The KMP algorithm compares \(P$ to each position in \(S$ in a left-to-right fashion. When a mismatch occurs at some index \(S[i+j] \neq P[j]$, \(P$ shifted by \(k$ positions to the left, where \(k$ is the length of the longest proper prefix of \(P$ that is a suffix of \(P[1..j-1]$ and simulteneously \(P[k+1] = P[j]$. For now, let us assume that we have the \(k$ value for each position \(j \in [1, m]$ precomputed in an array \(T$. Then the matching is done as follows:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{i }\OperatorTok{=} \DecValTok{0}
+\NormalTok{j }\OperatorTok{=} \DecValTok{0}
+\ControlFlowTok{while}\NormalTok{ i }\OperatorTok{\textless{}} \BuiltInTok{range}\NormalTok{(}\BuiltInTok{len}\NormalTok{(S)}\OperatorTok{{-}}\BuiltInTok{len}\NormalTok{(P)}\OperatorTok{{-}}\DecValTok{1}\NormalTok{):}
+    \ControlFlowTok{while}\NormalTok{ j }\OperatorTok{\textless{}} \BuiltInTok{range}\NormalTok{(}\BuiltInTok{len}\NormalTok{(P)) }\KeywordTok{and}\NormalTok{ P[j] }\OperatorTok{==}\NormalTok{ S[i]:}
+\NormalTok{        i }\OperatorTok{+=} \DecValTok{1}
+\NormalTok{        j }\OperatorTok{+=} \DecValTok{1}
+    \ControlFlowTok{if}\NormalTok{ j }\OperatorTok{==} \BuiltInTok{len}\NormalTok{(P):}
+\NormalTok{        output(j)}
+    \ControlFlowTok{while}\NormalTok{ j }\OperatorTok{\textgreater{}} \DecValTok{0} \KeywordTok{and}\NormalTok{ P[T[j]}\OperatorTok{+}\DecValTok{1}\NormalTok{] }\OperatorTok{!=}\NormalTok{ S[i]:}
+\NormalTok{        j }\OperatorTok{=}\NormalTok{ T[j]}
+\end{Highlighting}
+\end{Shaded}
+
+But how do we compute the array \(T$? Let us take a position \(P[i]$. The task si to find the largest \(j$, such that \(P[1..j]$ is the largest proper prefix of \(P$ that is also a suffix of \(P[1..i]$. This is, however, almost the same task if we assume that the values \(T[k]$ are computed for \(k \in [1,i-1]$. Then we are just looking for the largest index \(k$, such that \(P[T[k]] = P[i]$.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{T[}\DecValTok{0}\NormalTok{] }\OperatorTok{=} \DecValTok{0}
+\ControlFlowTok{for}\NormalTok{ i }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(}\DecValTok{1}\NormalTok{, }\BuiltInTok{len}\NormalTok{(P)):}
+\NormalTok{    j }\OperatorTok{=}\NormalTok{ i}
+    \ControlFlowTok{while}\NormalTok{ j }\OperatorTok{\textgreater{}} \DecValTok{0} \KeywordTok{and}\NormalTok{ P[T[j]] }\OperatorTok{!=}\NormalTok{ P[j]:}
+\NormalTok{        j }\OperatorTok{=}\NormalTok{ T[j]}
+\NormalTok{    T[i] }\OperatorTok{=}\NormalTok{ j }\OperatorTok{+}\NormalTok{ (P[T[j]] }\OperatorTok{==}\NormalTok{ P[j])}
+\end{Highlighting}
+\end{Shaded}
+
+Since \(T[k]$ is a \emph{proper} prefix, it holds that \(T[k] > T[T[k]] > ...$, hence at each position \(S[i]$ during the comparison we either increment \(i$ or shift the parent \(P$. This results in a \(O(n+m)$ worst case running time, which is also optimal.
+
+\hypertarget{aho-corasick}{%
+\subsection{Aho-Corasick}\label{aho-corasick}}
+
+What if we want to match a set of patterns (a pattern set) \(\mathcal{P} = P_1, \ldots, P_k$ of respective lengths \(n1, \ldots, n_k$? We can of course run KMP for each \(P_i$ giving us a \(O(kn + m)$ running time, where \(m = \sum_{i}^k n_k$. We can do better than that with smarter preprocessing. Let us construct a trie of all the patterns \(P_1, \ldots, P_k$. This can be done in \(O(m)$ time by sequentially insterting the patterns into the intermediate trie, following the `matching path' for as long as possible and branching off (only once) when necessary. We also store the index of the pattern into the corresponding vertex.
+
+At this point we need to introduce some notation. We will denote \(\lambda(e)$ to be the edge label and \(\phi(v)$ be the label of a vertex \(v$, i.e.~the string obtained by concatenating edge labels on the path from the root to \(v$. Once we have constructed the trie \(T$, we will need the so called \emph{failure links} that we show how to compute later. A failure link \(f(v)$ of a node \(v$ is the node \(w$ such that \(\phi(w)$ is the longest proper prefix of \(\phi(v)$ that is also a suffix of \(\phi(v)$. It is almost the same thing we precompute for the KMP algorithm.
+
+We are now almost ready to match the pattern set against a string \(S$ in the KMP fashion - we simultaneously traverse \(T$ and follow the failure links whenever a mismatch occurs or whenever we have successfully found an occurrence of a pattern from \(\mathcal{P}$. however, we need to resolve one caveat. If a pattern \(P_i$ is a proper substring of a pattern \(P_j$, then \(P_i$ can be missed during the matching. This can be fixed by introducing an \emph{output set}, which is defined as the set of pattern indices that can be picked up from either of the \(v, f(v), f(f(v)), \ldots, f^{d}(v) = \text{root}$ and denote this set as \(\text{output}(v)$. Then we report a match to all of the patterns in \(\text{output}(v)$ whenever we successfully stop the matching at \(v$.
+
+\begin{itemize}
+\tightlist
+\item[$\square$]
+  example of a missed pattern?
+\end{itemize}
+
+\hypertarget{computation-of-failure-links}{%
+\subsubsection{Computation of Failure Links}\label{computation-of-failure-links}}
+
+Naturally, we inquire about how to efficiently construct the failure links and the output sets. Luckily for us, both can be computed simultaneously, effectively and using a simple approach. We proceed iteratively from tyhe root to the leaves in `levels', i.e.~first we process the root, then all the vertices with the depth \(1$ and so on. During the computation we use the fact that when we process a vertex \(v$, its parent vertex \(v'$ with (obviously) smaller depth than \(v$ has already been processed and so we know the vertex \(f(v') = w$. We can therefore procees similarly as in the KMP preprocessing, following the failure links until we find a suitable vertex.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{v.f }\OperatorTok{=}\NormalTok{ root }\ControlFlowTok{for}\NormalTok{ v }\KeywordTok{in}\NormalTok{ vertices }\CommentTok{\# just initialization, will change later}
+\NormalTok{vertices }\OperatorTok{=}\NormalTok{ [}\DecValTok{1}\NormalTok{ .. max\_depth] }\CommentTok{\# vertices[k] stores all v s.t. d(v) = k}
+\ControlFlowTok{for}\NormalTok{ level }\KeywordTok{in} \BuiltInTok{range}\NormalTok{(}\DecValTok{1}\NormalTok{, max\_level): }\CommentTok{\# the root link is correctly set}
+    \ControlFlowTok{for}\NormalTok{ v }\KeywordTok{in}\NormalTok{ vertices[level]:}
+\NormalTok{        u }\OperatorTok{=}\NormalTok{ v}
+\NormalTok{        s }\OperatorTok{=}\NormalTok{ label[v]}
+        \ControlFlowTok{while}\NormalTok{ u }\OperatorTok{!=}\NormalTok{ root:}
+            \ControlFlowTok{if}\NormalTok{ there }\KeywordTok{is}\NormalTok{ an edge (u, w) labeled by s[}\OperatorTok{{-}}\DecValTok{1}\NormalTok{]:}
+\NormalTok{                v.f }\OperatorTok{=}\NormalTok{ w}
+\end{Highlighting}
+\end{Shaded}
+
+It is not that obvious, but an amortized analysis (very similar to that for KMP for one pattern $P_i$) on the total increase resp. decrease of the depth during the computation yields that we can compute both the failure links and the output sets in $O(m)$ time. When we have already done the preprocessing, the matching itself can be done in \(O(n)$ time.

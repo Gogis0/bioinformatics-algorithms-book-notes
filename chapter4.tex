@@ -1,0 +1,220 @@
+\hypertarget{chapter-4-sa-lcp}{%
+\section{Chapter 4 -- SA, LCP}\label{chapter-4-sa-lcp}}
+
+\section{Suffix Arrays and LCP Arrays}
+Suffix trees \cite{weiner1973linear} are among the most powerful and  versatile string data structures, enabling to solve a variety of problems in asymptotically optimal time, but their memory requirements -- $20$ bytes per input character in the worst case \cite{abouelhoda2004replacing} -- make them impractical for many tasks. Manben and Myers \cite{manber1993suffix} addressed this issue by introducing suffix arrays (SAs), a data structure that is more space-efficient in practice, but can be also leveraged to a large variety of problems on strings.
+
+The suffix array $SA_T$ of a string $T$ of length $n$ is a permutation of $[1,n]$ for which it holds that $SA_T[i]$ is the starting position of the $i$-th suffix of $T$ in terms of the \lex{} order. For example, if we have $T = \texttt{AGG\$}$, then $SA_T = [4, 1, 3, 2]$, because $\$ \prec AGG\$ \prec G\$ \prec GG\$$ . SAs therefore asymptotically occupy $O(n \log n)$ bits of space, which is the same as suffix trees, but in practice only around $4$ bytes per input character are used \cite{abouelhoda2004replacing}. SAs can be computed in optimal $O(n)$ time by a large variety of different algorithms that make trade-offs between time and memory usage as well as the achievable degree of parallelism, e.g. the popular \textit{Skew} \cite{karkkainen2003simple} or \textit{divsufsort} \cite{fischer2017dismantling} algorithms.
+
+
+%\hypertarget{skew}{%
+%\subsection{Skew}\label{skew}}
+
+%We divide the suffixes of $S$ into $A = \{ S_i ~|~ i \not\equiv 1\ (\textrm{mod}\ 3)\ \}$ and \(B = \{ S_i ~|~ i \equiv 1\ (\textrm{mod}\ 3)\ \}$. These suffix sets are subsequently sorted individually and then merged together, exactly like in mergesort. But how do we sort these? FIrst we sort \(B$ in the following way. TODO
+
+\hypertarget{induced-sorting}{%
+\subsection{Induced Sorting}\label{induced-sorting}}
+
+The basic idea of induced sorting (IS) algorithm is that we only need to sort a subset of the suffixes, called LMS suffixes, which in turn can be extended into the order of all of the suffixes. Let us label each suffix $S_i$ by either \(L$ in case $S_i > S_{i+1}$ or $S$ in case \(S_i < S_{i+1}$ ($S$ is $\$$-terminated, so we cannot have equality) and store the label for the suffix $S_i$ in the \emph{type array} $T[i]$. This classification can be done in $O(n)$ time using the fact that $\$$ is $S$-type and the following the case distinction:
+
+\begin{enumerate}
+\item if $S[i] = S[i+1]$, then $T[i] = T[i+1]$,
+\item if $S[i] < S[i+1]$, then $T[i] = S$,
+\item if $S[i] > S[i+1]$, then $T[i] = L$.
+\end{enumerate}
+
+We furthermore call a suffix $S_i$ a LMS suffix (\textbf{L}eft\textbf{M}ost\textbf{S}maller suffix) when $(i)$ it is of type $S$ and $(ii)$ $i = 1$ or $S_{i-1}$ is $L$ type. In other words, the LMS suffixes are the $S$ suffixes that have no $S$ suffix as a left neighbor. Let us say we already have sorted the LMS suffixes into their correct relative order by a procedure \textbf{mystery()}. We first show how we can use this information to sort the rest of the suffixes and then how to actually implement \textbf{mystery()}.
+Before we show how we can sort the rest of the suffixes, we first mention one more important observation, which is that if we have suffixes $S_i$ and $S_j$ such that $T(i) = S$ and $T[j] = L$ and both $S_i$ and $S_j$ start with the same character, then $S_j < S_i$. We can see this letting $S_i = uavcw, S_j = uvabw$ for $v,w \in \Sigma^*$ and $a, b,c \in \Sigma$, and distinguishing the two following cases:
+
+\begin{enumerate}
+\item If $v$ consists solely of $a$'s, then from $S_i < S_{i+1}$ we get $c > b$. Conversely, from $S_j > S_{j+1}$ we get $c < b$, which is a contradiction.
+\item Let $d$ be the first character in $v$ such that $d \neq a$. Then similarly we get a contradiction from $a > d$ and $d < a$.
+\end{enumerate} 
+
+Now we are ready to explain the core structure of the algorithm. First we create an array $A[1..n]$ that will serve as a placeholder for the indices of the sorted suffixes and that is conceptually divided into \emph{buckets}.
+Each such bucket represents a character $c \in \Sigma$, its size corresponds to $\text{Occ}(c, S)$ and the buckets are sorted according to the order of $\Sigma$, so the first bucket correspond to $\$$ and has a size one, etc. In fact, we can access the beginning of a bucket of a character $c$ by $C[c] + 1$ and its end by $C[c+1]$. Initially, each entry $A[i]$ is either filled with $\perp$ (undefined value) or $A[i] = j \neq \perp$ which $A[i] \neq \perp \neq A[j], ~i < j$ means that $S_{A[i]} < S_{A[j]}$.
+Initially, of course, the array contains the relative ranks of the LMS suffixes.
+Then we do the following:
+
+\begin{enumerate}
+\item \textit{Phase 1}: Sort the LMS suffixes using the \textbf{mystery()} function.
+\item \textit{Phase 2}: Do the following:
+		\begin{enumerate}
+		\def\labelenumi{\arabic{enumi}.}
+		\item Iterating over the sorted LMS suffixes from right to left, for each suffix position $i$, add it to the current end of the $S[i]$-bucket and shift the end of the bucket one position to the left.
+		\item Going from left to right, for each $A[i] \neq 		\perp$ s.t. $S_i$ if of type $L$, we set $A[i-1] = 			A[i] - 1$. In this step we correctly sort all the $L$-type suffixes. \label{IS-step2}
+		\item Going from right to left, for each $A[i] \neq 		\perp$ s.t. $S_i$ if of type $S$, we set $A[i-1] = 			A[i] - 1$. In this step we correctly sort all the $S$-type suffixes. \label{IS-step3}
+		\end{enumerate} 
+\end{enumerate}
+
+It can be shown that the step \ref{IS-step2} resp. \ref{IS-step3} of the Phase 2 correctly sorts the $L$ resp. $S$ suffixes.
+
+Now about the \textbf{mystery()}.
+Recall that \textbf{mystery()} sorts to LMS suffixes.
+We will be needing some additional notation.
+We call a LMS substring a substring of $S$ that both starts and ends at a LMS position.
+and it does it accordingly:
+
+\begin{enumerate}
+\item Initialize an array $A$ of the same function as in phase $2$ and an array $P[1..m]$ in which $m$ is number of LMS positions in $S$.
+\item Iterating over the string S from right to left, if the position $i$ is a LMS position, then add it to the current end of the $S[i]$-bucket and shift the end of the bucket one position to the left. Moreover, add the position $i$ to the current end of the $P$ array and move the end to the left. 
+\item Going from left to right, for each $A[i] \neq 		\perp$ s.t. $S_i$ if of type $L$, we set $A[i-1] = 			A[i] - 1$. \label{IS-phase2-step2}
+\item Going from right to left, for each $A[i] \neq 		\perp$ s.t. $S_i$ if of type $S$, we set $A[i-1] = 			A[i] - 1$. \label{IS-phase2-step3}
+\item Initialize variables $\overline{i} = 1, prev = 1$ and the array $LN[1..m]$ -- the \textit{lexicographic names} of the LMS suffixes. Since $\$$ is the lexicographically smallest LMS substring, we set $LN[n] = 1$. Next we iterate over the remaining suffixes and compare the current suffix $S_i$ with $S_{prev}$ character by character. If they differ, increment $\overline{i}$. We then set $LN[P[i]] := \overline{i}$, $prev := i$ and continue with the next suffix.
+\item If $\overline{i} = n$, then we can directly construct the suffix array $\overline{SA}$ of $\overline{S}$, where $\overline{S}[k] = \overline{LN[P[k]]}$ for $k \in [1..m]$.
+\item Otherwise construct the suffix array of $\overline{S}$ \textit{recursively}.
+\item The resulting suffix array of LMS suffixes is then $P[\overline{SA}[1]], \ldots, P[\overline{SA}[m]]$.
+\end{enumerate} 
+
+\subsubsection{Correctness}
+Let us first discuss the correctness of steps \ref{IS-step2} and \ref{IS-step3} of Phase $1$, for which the proofs are very similar.
+In step \ref{IS-step2} we first prove that when we place a $L$ suffix, it is placed to the correct position in the order.
+We do it by induction on the number $q$ of placed $L$-type suffixes.
+For $q = 0$, no suffix is placed, so the basis holds.
+Now we prove that if $q$ lexicographically smallest $L$ suffixes have been placed correctly, then the $(q+1)$-th largest suffix $S_j$ will be placed as well.
+Let $A[i] = j+1$, so at the position $i$ we add the suffix $S_j = c S_{j+1}$ to the current front of the $c$-bucket.
+We prove that there is no suffix $S_k > S_j$ in the bucket.
+To achieve a contradiction, suppose there is the suffix $S_k$.
+From the fact that $S_k$ appears at a sooner position in the $c$-bucket, there must have been $A[i'] = k+1$ such that $i' < i$.
+Moreover, since both $S_k, S_j$ are in the $c$-bucket, we have $S_k = c S_{k+1}$, $S_j = c S_{j+1}$ and from $S_k > S_j$ we also get $S_{k+1} > S_{j+1}$.
+This is, however, a contradiction with the fact that from the induction hypothesis resp.
+
+
+\subsubsection{Time complexity}
+We only need to address the recursion factor since other operations clearly take $O(n)$ time.
+Since the LMS positions are at least one position apart, the recursive step is called on an array of size $m \leq \frac{n}{2}$.
+Combining this with the Master theorem, we get that the algorithm takes $O(n)$ time.
+
+\hypertarget{longest-common-prefix-lcp-array}{%
+\subsection{Longest Common Prefix (LCP) Array}\label{longest-common-prefix-lcp-array}}
+
+Let $LCP[i] = |\textrm{lcp}(S_{SA[i]}, S_{SA[i-1]})|$, i.e.~the length of the longest common prefix of the lexicographically `consecutive' suffixes $S_{SA[i]}$ and $S_{SA[i-1]}$.
+We can compute the LCP array in $O(n)$ time from the SA by means of the following observation: if $SA[i] = k, SA[j] = k+1$ and $m = \textrm{lcp}(S_{SA[i]}, S_{SA[i-1]})$, then $\textrm{lcp}(S_{SA[j]}, S_{SA[j-1]})\geq m-1$, because $S_{k-1}$ is $1$ character shorter than $S_k$. This saves us redundant character comparisons.
+
+We can use this information to build the LCP array in one pass.
+More precisely, we build something that is called a Permuted LCP (PLCP) array that is defined as $\plcp[i] = \lcp[\isa[i]]$ (or alternatively $\plcp[\sa[i]] = \lcp[i]$) and transform it later to $\lcp$ using this equation.
+So in $\plcp$, the lcp values are computed for the prefix in the string order rather than their lexicographic order.
+We therefore traverse through the string $S$ from left to right for each suffix $S_i$ for $i \in [1..n]$ while keeping track of the longest common prefix $\ell$ from the previous suffix pair $S_{i-1}, S_{\phi(i-1)}$, where $\phi$ is defined as
+$$\phi(i) =
+\begin{cases}
+\sa[\isa[i]-1],  & \text{ if } i > 1\\
+-1, & \text{ otherwise}
+\end{cases}
+$$
+
+We then simply compute $\plcp[i] = |lcp(S_{i+\ell}, S_{\phi(i)+\ell}|$.
+Before the next iteration, we do $\ell := \max(\ell - 1, 0)$.
+
+If we wanted to construct the $\lcp$ array right away, we could use the same principle but we compare the suffix  $S_j = S_{\isa[i]}$ with $S_k = S_{\sa[j-1]}$.
+
+When we want to compute $lcp(S_{\sa[i]}), S_{\sa[j]})$, we can utilize the $\rmq$ over the $\lcp$. It is not difficult to see that
+$$lcp(S_\sa[i], S_\sa[j]) = \min_{k \in [i+1, j]} \lcp[k] = \rmq{i+1}{j}.$$
+
+\hypertarget{enhanced-suffix-arrays-esas}{%
+\subsection{Enhanced Suffix Arrays (ESAs)}\label{enhanced-suffix-arrays-esas}}
+
+The basic idea is that $\text{ESA} = \sa + \lcp$.
+It is awesome, because we can use it to simulate a suffix tree with a better memory print and better memory locality.
+
+\hypertarget{suffix-tree-simulation}{%
+\subsubsection{Suffix Tree Simulation}\label{suffix-tree-simulation}}
+
+The simulation is based on the concept of lcp interval.
+To be precise, a \emph{lcp interval} for a lcp value of $\ell$ -- denoted as $\ell-[i..j]$ -- is defined as an interval $[i..j]$ of the LCP array, at which:
+
+\begin{itemize}
+\tightlist
+\item
+  $\lcp[i] < \ell$ and $\lcp[j+1] < \ell$,
+\item
+  $\lcp[k] \geq \ell$ for all values $k \in [i+1..j]$,
+\item
+  $\lcp[k] = \ell$ for \emph{at least one} $k \in [i+1..j]$.
+\end{itemize}
+
+A special case of this is a singleton interval encompassing a single LCP value, denoted by simply $[i,i]$.
+Each lcp block $\ell-[i..j]$ is associated with a word $\omega$ that is the longest common prefix of the suffixes $S_{i+1}, \ldots, S_j$.
+Expectedly in this case it holds that $|\omega| = \ell$.
+The indices $k \in [i+1..j]$ at which $\lcp[k] = \ell$ are called the \emph{$\ell$-indices} of the respective lcp interval.
+
+The \emph{child lcp interval} of a lcp interval $\ell-[i..j]$ is the lcp interval $m-[p..q]$, such that:
+\begin{enumerate}
+    \item $i \leq p \leq q \leq j$
+    \item $\ell < m$ 
+\end{enumerate}
+
+We therefore have this implicit tree-like hierarchy in the LCP array, which is tightly linked to the suffix tree of $S$.
+The internal nodes of the ST correspond to the non-singleton $\ell-[i,j]$ intervals, while the leafs correspond to the singletons.
+This implied ST can be traversed by either top-down or bottom-up fashion, which we now explain in more detail a bit later.
+First we characterize the child resp. parent interval of a particular lcp-interval and describe how we can compute them.
+
+\paragraph{Children interval(s).}
+\label{sec:lcpChildren}
+Let $\ell-[i,j]$ be a lcp interval.
+Let $p_1, \ldots, p_k$ be the $\ell$-indices of $\ell-[i..j]$.
+The children of $\ell-[i..j]$ are then the intervals $[i, p_1-1], [p_1, p_2-1], \ldots, [p_{k-1}, p_k-1], [p_k, j]$.
+
+\paragraph{PSV, NSV and the Parent Interval.}
+To get the parent interval of a particular lcp interval, we need to introduce some additional arrays.
+For an array $A$, let $\psv[i] = \max \{ j ~|~ A[j] < A[i] \text{ and } j < i \}$ and $\nsv[i] = \min \{ j ~|~ A[j] < A[i] \text{ and } j > i \}$.
+We can calculate both arrays in $O(n)$ time using the following algorithm:
+
+\begin{minted}{python}
+PSV = [-1]*(n+1)
+NSV = [-1]*(n+1)
+s = stack([])
+for i in range(1, n):
+    while A[i] < A[s.top()]:
+        x = s.pop()
+        NSV[x] = i
+    if A[i] == A[s.top()]:
+        PSV[i] = PSV[s.top()]
+    else: # A[i] < A[s.top()]:
+        PSV[i] = s.top()
+    s.push(i)
+\end{minted}
+
+If we have a particular lcp interval $\ell - [i..j]$, we can obtain its parent interval by $[\psv[k], \nsv[k]]$, where $k$ is a $\ell$-index of $[i..j]$.
+Furthermore, using the following case distinction we get:
+\begin{enumerate}
+    \item $\lcp[i] < \lcp[j+1]$, or alternatively $\nsv[i] > j+1$, then the parent interval is $[i, \nsv[j+1]]$ and $[i..j]$ is its first child with $j+1$ being the first $\lcp[j+1]$-index.
+    \item $\lcp[i] > \lcp[j+1]$, or alternatively $\psv[j+1] < i$, then the parent interval is $[\psv[j+1], j]]$ and $[i..j]$ is its last child with $i$ being the last $\lcp[i]$-index.
+    \item $k = \lcp[i] = \lcp[j+1]$, then $i$ and $j+1$ are two consecutive $k$-indices of $[i..j]$ and the parent interval is $[\psv[i], \nsv[i]]$.
+\end{enumerate}
+
+
+\hypertarget{bottom-up-traversal}{%
+\paragraph{Bottom-up Traversal}\label{bottom-up-traversal}}
+
+This approach uses a stack and one traversal through the LCP array.
+Let $top$ be the reference to the top of the stack.
+We maintain the invariant that the top of the stack has its left boundary correctly set.
+
+\begin{minted}{python}
+LCP[0..n+1] # LCP[0] = LCP[n+1] = -1
+s = stack([LCP[0]])
+for i in range(1, len(LCP)):
+    while LCP[i] < LCP[s.top()]:
+        k = s.pop()
+        process(k, i)
+    if LCP[i] > LCP[s.top()]:
+        s.push(i)
+\end{minted}
+
+We now prove the correctness of the method. Obviously the lcp values on the stack are strictly increasing.
+
+\hypertarget{top-down-traversal}{%
+\paragraph{Top-down Traversal}\label{top-down-traversal}}
+
+This one is based on the observation that we can get generate the children intervals of an lcp interval $\ell-[i..j]$ as follows.
+
+Let us now assume we have arrived to the interval $\ell-[i..j]$ and want to visit its children. To do this, we employ the RMQ in the following way: 1. We generate $\text{RMQ}(i,j)$ to get the first $\ell$-index of $[i..j]$.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{k }\OperatorTok{=}\NormalTok{ i}
+\ControlFlowTok{while}\NormalTok{ k }\OperatorTok{\textless{}}\NormalTok{ j:}
+\NormalTok{    k }\OperatorTok{=}\NormalTok{ RMQ(k, j)}
+\NormalTok{    process(k, j)}
+\end{Highlighting}
+\end{Shaded}
